@@ -1,0 +1,74 @@
+#include <SPI.h>
+#include <WiFiNINA.h>
+#include <WiFiClient.h>
+
+// Update these with your network settings
+const char* ssid = "Soham";
+const char* password = "12345678";
+
+// IFTTT Webhook details
+const char* ifttt_server = "maker.ifttt.com";
+const char* ifttt_event = "Smoke detected in the house";  // Replace with your event name
+const char* ifttt_key = "mcU-xDKSAi2x25J0oOwHi4_eIvK7CbH17KLf2D13T4r";  // Replace with your IFTTT key
+
+WiFiClient wifiClient;
+
+void setup() {
+  Serial.begin(9600);
+  while (!Serial);
+
+  // Initialize WiFi
+  if (WiFi.status() == WL_NO_MODULE) {
+    Serial.println("Communication with WiFi module failed!");
+    while (true);
+  }
+
+  // Attempt to connect to WiFi network
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print("Attempting to connect to WPA SSID: ");
+    Serial.println(ssid);
+    WiFi.begin(ssid, password);
+    delay(5000);
+  }
+  Serial.println("You're connected to the network");
+}
+
+void triggerIFTTT() {
+  if (wifiClient.connect(ifttt_server, 80)) {
+    String url = "/trigger/";
+    url += ifttt_event;
+    url += "/with/key/";
+    url += ifttt_key;
+
+    wifiClient.print(String("POST ") + url + " HTTP/1.1\r\n" +
+                     "Host: " + ifttt_server + "\r\n" +
+                     "Content-Type: application/json\r\n" +
+                     "Connection: close\r\n\r\n" +
+                     "{}\r\n");
+
+    while (wifiClient.connected() && !wifiClient.available()) {
+      delay(10);
+    }
+
+    while (wifiClient.available()) {
+      String line = wifiClient.readStringUntil('\r');
+      Serial.print(line);
+    }
+    wifiClient.stop();
+  } else {
+    Serial.println("Failed to connect to IFTTT");
+  }
+}
+
+void loop() {
+  // Simulate sensor data
+  float sensorValue = analogRead(A0);  
+
+  // Check sensor value and trigger IFTTT if it exceeds the threshold
+  if (sensorValue > 400) {
+    Serial.println("Warning: Smoke level is too high!");
+    triggerIFTTT();
+  }
+
+  delay(2000);  
+}
